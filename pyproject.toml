@@ -1,0 +1,5 @@
+[project]
+name = "grabit-store"
+version = "1.0.0"
+description = "GRABIT production Flask ecommerce store for Render, PostgreSQL and Razorpay"
+requires-python = ">=3.13,<3.15"

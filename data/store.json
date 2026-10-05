@@ -1,0 +1,21 @@
+{
+  "settings": {
+    "storeName": "GRABIT",
+    "tagline": "Everything you want, simply delivered.",
+    "logoText": "GRABIT",
+    "currency": "INR",
+    "phone": "",
+    "whatsapp": "",
+    "email": "",
+    "address": "",
+    "freeShippingAbove": 999,
+    "shippingCharge": 49,
+    "heroTitle": "Shop smart. GRAB it.",
+    "heroSubtitle": "Discover useful products at great prices.",
+    "heroButton": "Shop Now",
+    "announcement": "Fast delivery • Secure Razorpay payments"
+  },
+  "products": [],
+  "orders": [],
+  "coupons": []
+}

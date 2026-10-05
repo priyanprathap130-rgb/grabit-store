@@ -1,0 +1,3 @@
+GRABIT database migrations.
+
+Production deploys run `flask db upgrade` before starting the web service.
