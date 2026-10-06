@@ -366,7 +366,7 @@ def admin_dashboard():
     # ---------------------------------
     # Revenue filter
     # ---------------------------------
-    period = request.args.get("period", "yearly")
+    period = request.args.get("period", "daily")
 
     try:
         year = int(request.args.get("year", datetime.now().year))
@@ -441,9 +441,10 @@ def admin_dashboard():
 
     order_count = Order.query.count()
 
-    pending = Order.query.filter(
-        Order.status.in_(["created", "paid", "processing"])
-    ).count()
+    ppending = Order.query.filter(
+    Order.payment_status == "paid",
+    Order.status.in_(["paid", "processing", "shipped"])
+).count()
 
     recent = Order.query.order_by(
         Order.created_at.desc()
