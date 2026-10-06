@@ -665,6 +665,23 @@ def _digits(value):
 def track_order():
     ip = request.remote_addr or "unknown"
     now = datetime.now(timezone.utc).timestamp()
+
+    ...
+
+    return jsonify({
+        "id": order.id,
+        "status": order.status,
+        "paymentStatus": order.payment_status,
+        "total": float(order.total),
+        "createdAt": order.created_at.isoformat() if order.created_at else None,
+        "items": [
+            {"name": i.product_name, "price": float(i.unit_price), "quantity": i.quantity}
+            for i in order.items
+        ],
+    })
+def track_order():
+    ip = request.remote_addr or "unknown"
+    now = datetime.now(timezone.utc).timestamp()
     if len(TRACK_HITS) > 5000:
         TRACK_HITS.clear()
     hits = [t for t in TRACK_HITS.get(ip, []) if now - t < 600]
@@ -693,7 +710,69 @@ def track_order():
             for i in order.items
         ],
     })
-def razorpay_webhook():
+@app.post("/api/orders/lookup")
+def lookup_orders():
+    ip = request.remote_addr or "unknown"
+    now = datetime.now(timezone.utc).timestamp()
+
+    if len(TRACK_HITS) > 5000:
+        TRACK_HITS.clear()
+
+    hits = [t for t in TRACK_HITS.get(ip, []) if now - t < 600]
+
+    if len(hits) >= 15:
+        return jsonify({
+            "error": "Too many attempts. Please try again in a few minutes."
+        }), 429
+
+    hits.append(now)
+    TRACK_HITS[ip] = hits
+
+    data = request.get_json(silent=True) or {}
+    phone = _digits(data.get("phone"))
+
+    if len(phone) < 8:
+        return jsonify({
+            "error": "Please enter a valid phone number."
+        }), 400
+
+    phone_last10 = phone[-10:]
+
+    orders = Order.query.order_by(Order.id.desc()).all()
+
+    matched_orders = []
+
+    for order in orders:
+        order_phone = _digits(order.customer_phone)
+
+        if order_phone[-10:] != phone_last10:
+            continue
+
+        if order.payment_status != "paid":
+            continue
+
+        matched_orders.append({
+            "id": order.id,
+            "status": order.status,
+            "paymentStatus": order.payment_status,
+            "total": float(order.total),
+            "createdAt": (
+                order.created_at.isoformat()
+                if order.created_at else None
+            ),
+            "items": [
+                {
+                    "name": item.product_name,
+                    "price": float(item.unit_price),
+                    "quantity": item.quantity
+                }
+                for item in order.items
+            ]
+        })
+
+    return jsonify({
+        "orders": matched_orders
+    })
     if not RAZORPAY_WEBHOOK_SECRET:
         return jsonify({"error": "Webhook is not configured"}), 503
     signature = request.headers.get("X-Razorpay-Signature", "")
