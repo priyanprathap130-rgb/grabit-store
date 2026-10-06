@@ -10,7 +10,70 @@ function openProduct(id=''){editing=id?products.find(p=>p.id===id):null;const f=
 function closeProduct(){$('#productModal').classList.add('hidden')}
 $('#productForm').onsubmit=async e=>{e.preventDefault();const f=e.target;let image=f.image.value.trim();const data={name:f.name.value,category:f.category.value,price:f.price.value,compareAtPrice:f.compareAtPrice.value,image,description:f.description.value,stock:f.stock.value,active:f.active.checked};try{if(f.id.value)await api('/api/admin/products/'+f.id.value,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});else await api('/api/admin/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});closeProduct();await loadProducts();loadDashboard();toast('Product saved')}catch(x){toast(x.message)}};
 async function deleteProduct(id){if(!confirm('Delete this product?'))return;await api('/api/admin/products/'+id,{method:'DELETE'});await loadProducts();loadDashboard();toast('Product deleted')}
-async function loadOrders(){orders=await api('/api/admin/orders');$('#orderTable').innerHTML=tableOrders(orders,true)}function tableOrders(list,actions=false){return `<table class="table"><tr><th>Order</th><th>Customer</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr>${list.map(o=>`<tr><td><b>${esc(o.id)}</b><br><small>${o.items?.length||0} item(s)</small></td><td>${esc(o.customer?.name)}<br><small>${esc(o.customer?.phone)}</small></td><td>${money(o.total)}</td><td>${esc(o.paymentStatus)}</td><td>${actions?`<select class="status" onchange="updateStatus('${o.id}',this.value)">${['created','paid','processing','shipped','delivered','cancelled'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select>`:esc(o.status)}</td><td>${new Date(o.createdAt).toLocaleString('en-IN')}</td></tr>`).join('')}</table>`}
+async function loadOrders(){orders=await api('/api/admin/orders');$('#orderTable').innerHTML=tableOrders(orders,true)}function tableOrders(list, actions = false) {
+    const trackingOptions = [
+        { value: 'created', label: 'Order placed' },
+        { value: 'paid', label: 'Payment received' },
+        { value: 'processing', label: 'Processing' },
+        { value: 'shipped', label: 'Shipped' },
+        { value: 'delivered', label: 'Delivered' }
+    ];
+
+    return `
+        <table class="table">
+            <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th>Tracking Status</th>
+                <th>Date</th>
+            </tr>
+
+            ${list.map(o => `
+                <tr>
+                    <td>
+                        <b>${esc(o.id)}</b><br>
+                        <small>${o.items?.length || 0} item(s)</small>
+                    </td>
+
+                    <td>
+                        ${esc(o.customer?.name)}<br>
+                        <small>${esc(o.customer?.phone)}</small>
+                    </td>
+
+                    <td>${money(o.total)}</td>
+
+                    <td>${esc(o.paymentStatus)}</td>
+
+                    <td>
+                        ${actions ? `
+                            <select
+                                class="status"
+                                onchange="updateStatus('${o.id}', this.value)"
+                            >
+                                ${trackingOptions.map(s => `
+                                    <option
+                                        value="${s.value}"
+                                        ${o.status === s.value ? 'selected' : ''}
+                                    >
+                                        ${s.label}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        ` : esc(
+                            trackingOptions.find(s => s.value === o.status)?.label || o.status
+                        )}
+                    </td>
+
+                    <td>
+                        ${new Date(o.createdAt).toLocaleString('en-IN')}
+                    </td>
+                </tr>
+            `).join('')}
+        </table>
+    `;
+}
 async function updateStatus(id,status){await api('/api/admin/orders/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});await loadOrders();loadDashboard();toast('Order updated')}
 async function loadSettings(){const s=await api('/api/admin/settings');const fields=[['storeName','Store name'],['tagline','Tagline'],['phone','Phone'],['whatsapp','WhatsApp'],['email','Email'],['address','Address'],['heroTitle','Hero title'],['heroSubtitle','Hero subtitle'],['heroButton','Hero button'],['announcement','Announcement'],['shippingCharge','Shipping charge'],['freeShippingAbove','Free shipping above']];$('#settingsForm').innerHTML=fields.map(([k,l])=>`<label class="${k==='address'||k==='heroSubtitle'||k==='announcement'?'full':''}">${l}<input data-key="${k}" value="${esc(s[k]??'')}"></label>`).join('')}
 async function saveSettings(){const body={};document.querySelectorAll('#settingsForm [data-key]').forEach(x=>body[x.dataset.key]=['shippingCharge','freeShippingAbove'].includes(x.dataset.key)?Number(x.value||0):x.value);await api('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});toast('Settings saved')}
