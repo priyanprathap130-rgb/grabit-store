@@ -190,7 +190,8 @@ def order_dict(o):
         "customer": {
             "name": o.customer_name,
             "email": o.customer_email or "",
-                        "phone": f"{o.customer_phone} | {o.customer_email or ''} | {o.address}",
+            "phone": f"{o.customer_phone} | {o.customer_email or ''} | {o.address} | ITEMS: " + ", ".join(
+                f"{i.product_name} x{i.quantity}" for i in o.items),
             "address": o.address,
         },
         "total": float(o.total),
