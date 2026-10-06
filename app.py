@@ -363,16 +363,102 @@ def admin_me():
 @app.get("/api/admin/dashboard")
 @admin_required
 def admin_dashboard():
+    # ---------------------------------
+    # Revenue filter
+    # ---------------------------------
+    period = request.args.get("period", "yearly")
+
+    try:
+        year = int(request.args.get("year", datetime.now().year))
+        month = int(request.args.get("month", datetime.now().month))
+        day = int(request.args.get("day", datetime.now().day))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid date"}), 400
+
+    # Validate year
+    if year < 2000 or year > 2100:
+        return jsonify({"error": "Invalid year"}), 400
+
+    # ---------------------------------
+    # Create revenue date range
+    # ---------------------------------
+    try:
+        if period == "yearly":
+
+            start_date = datetime(year, 1, 1)
+            end_date = datetime(year + 1, 1, 1)
+
+            revenue_label = f"Year {year}"
+
+        elif period == "monthly":
+
+            start_date = datetime(year, month, 1)
+
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1)
+            else:
+                end_date = datetime(year, month + 1, 1)
+
+            revenue_label = f"{month:02d}/{year}"
+
+        elif period == "daily":
+
+            start_date = datetime(year, month, day)
+            end_date = start_date + timedelta(days=1)
+
+            revenue_label = f"{day:02d}/{month:02d}/{year}"
+
+        else:
+            return jsonify({"error": "Invalid revenue period"}), 400
+
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+
+    # ---------------------------------
+    # Calculate revenue
+    # ---------------------------------
+    revenue = db.session.query(
+        db.func.coalesce(db.func.sum(Order.total), 0)
+    ).filter(
+        Order.payment_status == "paid",
+        Order.created_at >= start_date,
+        Order.created_at < end_date
+    ).scalar() or 0
+
+    # Number of paid orders for selected period
+    paid_orders = db.session.query(
+        db.func.count(Order.id)
+    ).filter(
+        Order.payment_status == "paid",
+        Order.created_at >= start_date,
+        Order.created_at < end_date
+    ).scalar() or 0
+
+    # ---------------------------------
+    # Existing dashboard calculations
+    # ---------------------------------
     active_products = Product.query.filter_by(active=True).count()
+
     order_count = Order.query.count()
-    pending = Order.query.filter(Order.status.in_(["created", "paid", "processing"])).count()
-    revenue = db.session.query(db.func.coalesce(db.func.sum(Order.total), 0)).filter(Order.payment_status == "paid").scalar() or 0
-    recent = Order.query.order_by(Order.id.desc()).limit(10).all()
+
+    pending = Order.query.filter(
+        Order.status.in_(["created", "paid", "processing"])
+    ).count()
+
+    recent = Order.query.order_by(
+        Order.created_at.desc()
+    ).limit(10).all()
+
     return jsonify({
         "activeProducts": active_products,
         "orders": order_count,
         "pending": pending,
+
+        # Selected-period revenue
         "revenue": float(revenue),
+        "paidOrders": paid_orders,
+        "revenueLabel": revenue_label,
+
         "recent": [order_dict(o) for o in recent],
     })
 
