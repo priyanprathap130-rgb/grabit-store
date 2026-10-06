@@ -68,3 +68,13 @@
 .trCancel{background:#fdecea;color:#c0392b;padding:10px 12px;border-radius:10px;font-weight:700;margin-top:14px}
 .trOk{width:54px;height:54px;border-radius:50%;background:#e4f6ea;color:#0a7a3d;font-size:28px;font-weight:800;display:grid;place-items:center;margin-bottom:12px}
 @media(max-width:700px){.trBox{max-width:none;border-radius:22px 22px 0 0;animation:pmUp .25s ease}}
+.trCard{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px;cursor:pointer;font:inherit}
+.trCard:hover{border-color:#111}
+.trMain{display:grid;gap:3px;min-width:0}
+.trMain small{color:var(--muted)}
+.trProd{font-size:14px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px;display:block}
+.trSide{display:grid;gap:6px;justify-items:end;flex:none}
+.trBadge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;background:#eef2ff;color:#3b4cca}
+.trBadge.ok{background:#e4f6ea;color:#0a7a3d}
+.trBadge.bad{background:#fdecea;color:#c0392b}
+.trBack{background:none;border:0;font:inherit;font-weight:700;cursor:pointer;padding:0;margin-bottom:4px}
