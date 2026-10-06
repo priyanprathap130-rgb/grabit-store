@@ -653,7 +653,45 @@ def verify_payment():
     return jsonify({"ok": True, "orderId": order.id})
 
 
-@app.post("/api/razorpay/webhook")
+TRACK_HITS = {}
+
+
+def _digits(value):
+    return re.sub(r"\D", "", str(value or ""))
+
+
+@app.post("/api/orders/track")
+def track_order():
+    ip = request.remote_addr or "unknown"
+    now = datetime.now(timezone.utc).timestamp()
+    if len(TRACK_HITS) > 5000:
+        TRACK_HITS.clear()
+    hits = [t for t in TRACK_HITS.get(ip, []) if now - t < 600]
+    if len(hits) >= 15:
+        return jsonify({"error": "Too many attempts. Please try again in a few minutes."}), 429
+    hits.append(now)
+    TRACK_HITS[ip] = hits
+
+    data = request.get_json(silent=True) or {}
+    order_no = _digits(data.get("orderId"))
+    phone = _digits(data.get("phone"))
+    not_found = (jsonify({"error": "We could not find an order with these details."}), 404)
+    if not order_no or len(order_no) > 9 or len(phone) < 8:
+        return not_found
+    order = db.session.get(Order, int(order_no))
+    if not order or _digits(order.customer_phone)[-10:] != phone[-10:]:
+        return not_found
+    return jsonify({
+        "id": order.id,
+        "status": order.status,
+        "paymentStatus": order.payment_status,
+        "total": float(order.total),
+        "createdAt": order.created_at.isoformat() if order.created_at else None,
+        "items": [
+            {"name": i.product_name, "price": float(i.unit_price), "quantity": i.quantity}
+            for i in order.items
+        ],
+    })
 def razorpay_webhook():
     if not RAZORPAY_WEBHOOK_SECRET:
         return jsonify({"error": "Webhook is not configured"}), 503
