@@ -178,6 +178,7 @@ def product_dict(p):
         "compareAtPrice": float(p.compare_at_price) if p.compare_at_price is not None else None,
         "stock": p.stock,
         "image": p.image or "",
+        "images": split_images(p.image),
         "description": p.description or "",
         "active": p.active,
     }
@@ -329,7 +330,7 @@ def store_api():
 @app.get("/api/products")
 def products_api():
     products = Product.query.order_by(Product.id.desc()).all()
-    return jsonify([product_dict(p) for p in products])
+    return jsonify([{**product_dict(p), "id": str(p.id)} for p in products])
 
 
 @app.post("/api/admin/login")
@@ -399,12 +400,22 @@ def save_settings():
     return jsonify(settings_dict())
 
 
+def split_images(value):
+    return [u for u in re.split(r"[,\s]+", value or "") if u]
+
+
 def valid_image_url(value):
     if not value:
         return True
     try:
-        parsed = urlparse(value)
-        return parsed.scheme in {"http", "https"} and bool(parsed.netloc) and len(value) <= 2000
+        urls = split_images(value)
+        if not urls or len(urls) > 8 or len(value) > 4000:
+            return False
+        for u in urls:
+            parsed = urlparse(u)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                return False
+        return True
     except Exception:
         return False
 
