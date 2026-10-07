@@ -133,7 +133,23 @@ DEFAULT_SETTINGS = {
     "announcement": "",
     "shippingCharge": "0",
     "freeShippingAbove": "999",
+    "themePreset": "classic",
+    "themeFont": "modern",
+    "themeBtn": "",
+    "themeBg": "",
+    "themeInk": "",
+    "themeHero1": "",
+    "themeHero2": "",
+    "banner1": "",
+    "banner2": "",
+    "banner3": "",
 }
+
+BANNER_KEYS = {"banner1", "banner2", "banner3"}
+
+THEME_COLOR_KEYS = {"themeBtn", "themeBg", "themeInk", "themeHero1", "themeHero2"}
+THEME_PRESETS = {"classic", "midnight", "forest", "ocean", "rose", "mono"}
+THEME_FONTS = {"modern", "serif"}
 
 
 def seed_default_settings():
@@ -478,12 +494,21 @@ def save_settings():
     for key, value in data.items():
         if key not in allowed:
             continue
+        value = str(value)
+        if key in THEME_COLOR_KEYS and value and not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            continue
+        if key in BANNER_KEYS and value and not (len(split_images(value)) == 1 and valid_image_url(value)):
+            continue
+        if key == "themePreset" and value not in THEME_PRESETS:
+            continue
+        if key == "themeFont" and value not in THEME_FONTS:
+            continue
         setting = db.session.get(Setting, key)
         if setting is None:
-            setting = Setting(key=key, value=str(value))
+            setting = Setting(key=key, value=value)
             db.session.add(setting)
         else:
-            setting.value = str(value)
+            setting.value = value
     db.session.commit()
     return jsonify(settings_dict())
 
