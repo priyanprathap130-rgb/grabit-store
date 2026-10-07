@@ -432,4 +432,53 @@ tabBtn.onclick=()=>{showTab('appearance');load()};
 renderAll();
 })();
 
+
+(function(){
+const FIELDS=[
+['bizName','Business / legal name','e.g. GRABIT Traders'],
+['gstin','GSTIN (optional)','e.g. 32ABCDE1234F1Z5'],
+['hours','Working hours','e.g. Mon to Sat, 10 AM to 6 PM'],
+['shipAreas','Delivery areas','across India'],
+['dispatchDays','Dispatch time (business days)','1-2'],
+['deliveryDays','Delivery time (business days)','3-7'],
+['returnDays','Return window (days after delivery)','7'],
+['refundDays','Refund time (business days)','5-7'],
+['nonReturnable','Items that cannot be returned (optional)','e.g. opened personal-care items'],
+['priceNote','Price note','Prices are inclusive of all applicable taxes.'],
+['grievanceName','Grievance officer name','Your name'],
+['grievanceEmail','Grievance officer email (uses store email if empty)','you@example.com'],
+['jurisdiction','City and state for legal disputes','e.g. Kozhikode, Kerala']];
+const PAGES=[['about-us','About Us'],['contact-us','Contact Us'],['pricing','Pricing Details'],['shipping-policy','Shipping Policy'],['refund-policy','Cancellation & Refund Policy'],['terms','Terms & Conditions'],['privacy-policy','Privacy Policy']];
+const css=document.createElement('style');css.textContent=`
+.plNote{color:#555;margin:0 0 14px;font-size:14px;line-height:1.55}
+.plWarn{background:#fff4e5;border:1px solid #ffd8a8;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px;line-height:1.6}
+.plOk{background:#e4f6ea;border:1px solid #b7e4c7;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+.plGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.plGrid label{display:grid;gap:6px;font-size:13px;font-weight:700}
+.plGrid input{padding:11px 12px;border:1px solid #e7e7e7;border-radius:10px;font:inherit;font-weight:400}
+.plLinks{display:grid;gap:8px;margin:0;padding:0;list-style:none;font-size:14px}
+.plLinks li{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;border:1px solid #e7e7e7;border-radius:10px;padding:9px 12px}
+.plLinks b{min-width:190px}
+.plLinks code{background:#f6f5f1;padding:3px 8px;border-radius:6px;word-break:break-all}
+`;document.head.appendChild(css);
+const aside=document.querySelector('aside'),main=document.querySelector('main');
+const tabBtn=document.createElement('button');tabBtn.dataset.tab='policies';tabBtn.textContent='Policies';
+aside.insertBefore(tabBtn,aside.querySelector('a'));
+const sec=document.createElement('section');sec.id='policies';sec.className='tab hidden';
+sec.innerHTML=`<div class="sectionHead"><div><h1>Policies &amp; legal pages</h1><p>Razorpay needs these pages on your website before it gives you live keys. They are created automatically from the details below.</p></div><button class="primary" id="plSave">Save</button></div>
+<div id="plCheck"></div>
+<div class="panel"><h2 class="thH">1. Your details</h2><p class="plNote">Your phone, email and address come from <b>Store Settings</b>. Fill in the rest here. Short answers are fine, and anything left empty uses a sensible default.</p><div class="plGrid" id="plGrid"></div></div>
+<div class="panel" style="margin-top:16px"><h2 class="thH">2. Your pages</h2><p class="plNote">Click a page to read it. Paste these links into Razorpay (Account &amp; Settings, then Business website details). The same links are in your store's footer.</p><ul class="plLinks" id="plLinks"></ul></div>
+<div class="panel" style="margin-top:16px"><p class="plNote" style="margin:0"><b>Please note:</b> these pages are templates written for a small Indian online store. Read each one, make sure it matches how you really work (for example your return and refund promises), and have a professional review them if you can. They are not legal advice.</p></div>`;
+main.appendChild(sec);
+document.getElementById('plGrid').innerHTML=FIELDS.map(f=>`<label>${esc(f[1])}<input data-k="${f[0]}" placeholder="${esc(f[2])}"></label>`).join('');
+document.getElementById('plLinks').innerHTML=PAGES.map(p=>{const u=location.origin+'/policy/'+p[0];return `<li><b><a href="/policy/${p[0]}" target="_blank">${esc(p[1])}</a></b><code>${esc(u)}</code></li>`}).join('');
+async function load(){let s={};try{s=await api('/api/admin/settings')}catch(e){}
+document.querySelectorAll('#plGrid input').forEach(i=>{i.value=s[i.dataset.k]||''});
+const need=[];if(!(s.phone||'').trim())need.push('phone number');if(!(s.email||'').trim())need.push('email address');if(!(s.address||'').trim())need.push('business address');if(!(s.storeName||'').trim())need.push('store name');
+document.getElementById('plCheck').innerHTML=need.length?`<div class="plWarn"><b>Still missing in Store Settings:</b> ${need.map(esc).join(', ')}. Razorpay checks your Contact Us page for these, so please add them in the <b>Store Settings</b> tab.</div>`:'<div class="plOk">Your store phone, email and address are filled in. Your Contact Us page is ready.</div>'}
+document.getElementById('plSave').onclick=async()=>{const b=document.getElementById('plSave');b.disabled=true;const body={};document.querySelectorAll('#plGrid input').forEach(i=>{body[i.dataset.k]=i.value.trim()});try{await api('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});toast('Saved. Your policy pages are updated.')}catch(e){toast(e.message)}finally{b.disabled=false}};
+tabBtn.onclick=()=>{showTab('policies');load()};
+})();
+
 boot();
