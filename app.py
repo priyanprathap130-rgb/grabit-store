@@ -9,7 +9,8 @@ from functools import wraps
 from urllib.parse import urlparse
 
 import razorpay
-from flask import Flask, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory, session
+from markupsafe import escape
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -143,7 +144,23 @@ DEFAULT_SETTINGS = {
     "banner1": "",
     "banner2": "",
     "banner3": "",
+    "bizName": "",
+    "gstin": "",
+    "hours": "",
+    "shipAreas": "across India",
+    "dispatchDays": "1-2",
+    "deliveryDays": "3-7",
+    "returnDays": "7",
+    "refundDays": "5-7",
+    "nonReturnable": "",
+    "priceNote": "Prices are inclusive of all applicable taxes.",
+    "grievanceName": "",
+    "grievanceEmail": "",
+    "jurisdiction": "",
 }
+
+POLICY_KEYS = {"bizName", "gstin", "hours", "shipAreas", "dispatchDays", "deliveryDays", "returnDays",
+               "refundDays", "nonReturnable", "priceNote", "grievanceName", "grievanceEmail", "jurisdiction"}
 
 BANNER_KEYS = {"banner1", "banner2", "banner3"}
 
@@ -328,6 +345,296 @@ def health():
         return jsonify({"ok": False, "database": "unavailable"}), 503
 
 
+POLICY_PAGES = [
+    ("about-us", "About Us"),
+    ("contact-us", "Contact Us"),
+    ("pricing", "Pricing Details"),
+    ("shipping-policy", "Shipping Policy"),
+    ("refund-policy", "Cancellation & Refund Policy"),
+    ("terms", "Terms & Conditions"),
+    ("privacy-policy", "Privacy Policy"),
+]
+
+THEME_PRESET_VARS = {
+    "classic": dict(btn="#111111", bg="#ffffff", surface="#ffffff", ink="#161616", muted="#6b6b6b", line="#e7e7e7", soft="#f6f5f1", radius="18px"),
+    "midnight": dict(btn="#ff5a36", bg="#0f1115", surface="#181b22", ink="#f2f3f5", muted="#9aa0ab", line="#2a2f3a", soft="#20242d", radius="16px"),
+    "forest": dict(btn="#14532d", bg="#ffffff", surface="#ffffff", ink="#10231a", muted="#5b6f64", line="#dfe9e2", soft="#f1f7f3", radius="14px"),
+    "ocean": dict(btn="#1d4ed8", bg="#ffffff", surface="#ffffff", ink="#0f172a", muted="#64748b", line="#e2e8f0", soft="#f1f5f9", radius="14px"),
+    "rose": dict(btn="#be185d", bg="#fffafb", surface="#ffffff", ink="#2a1520", muted="#7a5c69", line="#f1dfe6", soft="#fbf1f5", radius="22px"),
+    "mono": dict(btn="#000000", bg="#ffffff", surface="#ffffff", ink="#000000", muted="#666666", line="#dddddd", soft="#f5f5f5", radius="4px"),
+}
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _luminance(hex_color):
+    channels = []
+    for i in (1, 3, 5):
+        v = int(hex_color[i:i + 2], 16) / 255
+        channels.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def theme_vars(s):
+    t = dict(THEME_PRESET_VARS.get(s.get("themePreset"), THEME_PRESET_VARS["classic"]))
+    if _HEX.match(s.get("themeBtn") or ""):
+        t["btn"] = s["themeBtn"]
+    if _HEX.match(s.get("themeBg") or ""):
+        t["bg"] = t["surface"] = s["themeBg"]
+    if _HEX.match(s.get("themeInk") or ""):
+        t["ink"] = s["themeInk"]
+    t["btnText"] = "#111111" if _luminance(t["btn"]) > 0.55 else "#ffffff"
+    t["font"] = 'Georgia,"Times New Roman",serif' if s.get("themeFont") == "serif" else "Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif"
+    return t
+
+
+def _p(s, key, default=""):
+    return str(escape((s.get(key) or default).strip()))
+
+
+def _ship_text(s):
+    try:
+        charge = float(s.get("shippingCharge") or 0)
+        free = float(s.get("freeShippingAbove") or 0)
+    except ValueError:
+        charge, free = 0.0, 0.0
+    if not charge:
+        return "Delivery is free on all orders."
+    if free:
+        return f"A delivery charge of ₹{charge:g} applies to orders below ₹{free:g}. Delivery is free on orders of ₹{free:g} and above."
+    return f"A delivery charge of ₹{charge:g} applies to every order."
+
+
+def _contact_list(s):
+    rows = []
+    biz = _p(s, "bizName") or _p(s, "storeName", "Our store")
+    rows.append(f"<li><b>Business name:</b> {biz}</li>")
+    if _p(s, "gstin"):
+        rows.append(f"<li><b>GSTIN:</b> {_p(s, 'gstin')}</li>")
+    if _p(s, "address"):
+        rows.append(f"<li><b>Address:</b> {_p(s, 'address')}</li>")
+    if _p(s, "phone"):
+        rows.append(f"<li><b>Phone:</b> {_p(s, 'phone')}</li>")
+    if _p(s, "email"):
+        rows.append(f"<li><b>Email:</b> <a href=\"mailto:{_p(s, 'email')}\">{_p(s, 'email')}</a></li>")
+    if _p(s, "hours"):
+        rows.append(f"<li><b>Working hours:</b> {_p(s, 'hours')}</li>")
+    return "<ul>" + "".join(rows) + "</ul>"
+
+
+def build_policy_pages(s):
+    store = _p(s, "storeName", "Our store")
+    biz = _p(s, "bizName") or store
+    email = _p(s, "email")
+    contact_line = f'Write to us at <a href="mailto:{email}">{email}</a>' if email else "Contact us using the details on our Contact Us page"
+    if _p(s, "phone"):
+        contact_line += f" or call {_p(s, 'phone')}"
+    contact_line += "."
+    dispatch = _p(s, "dispatchDays", "1-2")
+    delivery = _p(s, "deliveryDays", "3-7")
+    areas = _p(s, "shipAreas", "across India")
+    ret = _p(s, "returnDays", "7")
+    refund = _p(s, "refundDays", "5-7")
+    juris = _p(s, "jurisdiction") or "India"
+    g_name = _p(s, "grievanceName")
+    g_mail = _p(s, "grievanceEmail") or email
+    non_ret = _p(s, "nonReturnable")
+    non_ret_html = f"<p><b>Items that cannot be returned:</b> {non_ret}</p>" if non_ret else ""
+    tagline = _p(s, "tagline")
+    pages = {}
+
+    pages["about-us"] = f"""
+<p>{store} is an online store operated by {biz}. {tagline}</p>
+<p>We aim to offer useful products at fair prices, with clear information, secure payments and support you can reach.</p>
+<h2>Contact</h2>
+<p>{contact_line}</p>
+"""
+
+    pages["contact-us"] = f"""
+<p>We are happy to help with questions about products, orders, delivery, returns or refunds.</p>
+<h2>Business details</h2>
+{_contact_list(s)}
+<h2>Grievance officer</h2>
+<p>{('Name: ' + g_name + '<br>') if g_name else ''}{('Email: <a href="mailto:' + g_mail + '">' + g_mail + '</a>') if g_mail else ''}</p>
+<p>We acknowledge complaints within 48 hours and work to resolve them within one month.</p>
+"""
+
+    pages["pricing"] = f"""
+<p>All prices on {store} are in Indian Rupees (INR).</p>
+<ul>
+<li>The selling price is shown on each product. A crossed-out price, where shown, is the original price for comparison.</li>
+<li>{_p(s, 'priceNote', 'Prices are inclusive of all applicable taxes.')}</li>
+<li>{_ship_text(s)}</li>
+<li>The final amount you pay, including any delivery charge, is shown at checkout before you pay. There are no hidden charges.</li>
+</ul>
+<p>We may correct pricing or listing errors. If a product is listed at a wrong price, we will contact you before dispatch, and you may cancel for a full refund.</p>
+"""
+
+    pages["shipping-policy"] = f"""
+<h2>Where we deliver</h2>
+<p>We deliver {areas}.</p>
+<h2>Dispatch and delivery time</h2>
+<ul>
+<li>Orders are dispatched within {dispatch} business days after payment is confirmed.</li>
+<li>Delivery usually takes {delivery} business days after dispatch, depending on your location and the courier.</li>
+<li>Delays can happen because of weather, holidays or courier issues. We will help you track and resolve them.</li>
+</ul>
+<h2>Delivery charges</h2>
+<p>{_ship_text(s)}</p>
+<h2>Tracking your order</h2>
+<p>Use <b>Track order</b> on our website and enter the phone number you used at checkout to see your order status.</p>
+<h2>Wrong or incomplete address</h2>
+<p>Please check your address and PIN code before paying. If a parcel cannot be delivered because of a wrong or incomplete address, extra delivery charges may apply for re-sending it.</p>
+<p>{contact_line}</p>
+"""
+
+    pages["refund-policy"] = f"""
+<h2>Cancellation</h2>
+<ul>
+<li>You can cancel an order before it is dispatched. Contact us as soon as possible with your order number.</li>
+<li>Once an order has been dispatched it cannot be cancelled, but you may be able to return it as described below.</li>
+</ul>
+<h2>Returns</h2>
+<ul>
+<li>You can request a return within {ret} days of delivery if the product is damaged, defective, or different from what you ordered.</li>
+<li>Please share photos of the product and the packaging when you contact us.</li>
+<li>Returned products must be unused and in their original packaging.</li>
+</ul>
+{non_ret_html}
+<h2>Refunds</h2>
+<ul>
+<li>Approved refunds are sent to your original payment method within {refund} business days.</li>
+<li>If money was deducted but your order was not confirmed, the amount is usually returned automatically by your bank or payment provider within 5 to 7 business days. If it is not, contact us with your payment details.</li>
+</ul>
+<h2>How to request a return or refund</h2>
+<p>{contact_line} Please include your order number and phone number.</p>
+"""
+
+    pages["terms"] = f"""
+<p>These terms apply to your use of {store}, operated by {biz}. By placing an order you agree to them.</p>
+<h2>1. Eligibility</h2>
+<p>You must be at least 18 years old, or use the store with a parent or guardian, to place an order.</p>
+<h2>2. Products and prices</h2>
+<p>We try to describe products and prices accurately. Product photos are for reference and colours may vary slightly. We may correct errors and may cancel an order affected by one, with a full refund.</p>
+<h2>3. Orders and payment</h2>
+<p>Your order is confirmed once payment is successful. Payments are processed securely by Razorpay. We do not see or store your card, UPI or bank details.</p>
+<h2>4. Delivery, returns and refunds</h2>
+<p>Please read our <a href="/policy/shipping-policy">Shipping Policy</a> and <a href="/policy/refund-policy">Cancellation &amp; Refund Policy</a>, which are part of these terms.</p>
+<h2>5. Your responsibilities</h2>
+<p>Provide correct contact and delivery details. Do not misuse the website, attempt to interfere with its operation, or use it for unlawful purposes.</p>
+<h2>6. Intellectual property</h2>
+<p>The content on this website, including text, images and design, belongs to {biz} or its licensors and may not be copied without permission.</p>
+<h2>7. Limitation of liability</h2>
+<p>To the extent permitted by law, we are not liable for indirect or consequential losses. Our total liability for any order is limited to the amount you paid for it.</p>
+<h2>8. Governing law</h2>
+<p>These terms are governed by the laws of India. Courts at {juris} have jurisdiction over any dispute.</p>
+<h2>9. Changes</h2>
+<p>We may update these terms from time to time. The version on this page applies when you place your order.</p>
+<h2>10. Contact</h2>
+<p>{contact_line}</p>
+"""
+
+    pages["privacy-policy"] = f"""
+<p>{biz} respects your privacy. This policy explains what personal data {store} collects, why, and your choices. We handle personal data in line with applicable Indian law, including the Digital Personal Data Protection Act, 2023.</p>
+<h2>Information we collect</h2>
+<ul>
+<li>Details you enter at checkout: name, phone number, email address (optional), delivery address, city and PIN code.</li>
+<li>Order details: products bought, amounts, order status and payment status.</li>
+<li>Technical data stored in your browser, such as your cart and display preferences.</li>
+</ul>
+<p>Payments are handled by Razorpay. We do not receive or store your card, UPI or bank details.</p>
+<h2>How we use it</h2>
+<ul>
+<li>To process, deliver and support your order, and to show you your order status.</li>
+<li>To handle returns, refunds and complaints.</li>
+<li>To meet accounting, tax and legal requirements.</li>
+</ul>
+<h2>Who we share it with</h2>
+<p>Only with those needed to complete your order: our payment provider (Razorpay), courier and delivery partners, and authorities where the law requires. We do not sell your personal data.</p>
+<h2>Order tracking</h2>
+<p>The Track order page shows the status of orders linked to a phone number. It does not show your address or email.</p>
+<h2>How long we keep it</h2>
+<p>We keep order records for as long as needed for orders, returns, accounting and legal obligations, then delete or anonymise them.</p>
+<h2>Your rights</h2>
+<p>You can ask to access, correct or delete your personal data, or withdraw consent, by contacting us. We will respond within a reasonable time, subject to legal retention requirements.</p>
+<h2>Security</h2>
+<p>We use reasonable safeguards, including encrypted connections (HTTPS) and restricted admin access. No online system is completely risk-free.</p>
+<h2>Contact and grievances</h2>
+<p>{contact_line}</p>
+{('<p>Grievance officer: ' + g_name + '</p>') if g_name else ''}
+"""
+    return pages
+
+
+POLICY_TEMPLATE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%%TITLE%% | %%STORE%%</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><style>
+:root{%%VARS%%}
+*{box-sizing:border-box}body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg);line-height:1.65}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 5%;border-bottom:1px solid var(--line);background:var(--surface)}
+.logo{font-size:24px;font-weight:900;letter-spacing:-1px;color:var(--ink);text-decoration:none}
+.back{color:var(--ink);text-decoration:none;font-weight:600}
+main{max-width:780px;margin:0 auto;padding:40px 20px 60px}
+h1{font-size:34px;line-height:1.2;margin:0 0 22px;letter-spacing:-1px}
+h2{font-size:20px;margin:30px 0 8px}
+p,li{color:var(--ink)}li{margin:6px 0}
+a{color:var(--btn)}
+ul{padding-left:22px}
+footer{background:var(--btn);color:var(--btn-text);padding:28px 5%;text-align:center}
+footer a{color:var(--btn-text);opacity:.85;margin:0 10px;text-decoration:none;white-space:nowrap;display:inline-block;line-height:2}
+footer a:hover{opacity:1;text-decoration:underline}
+</style></head><body>
+<header><a class="logo" href="/">%%STORE%%</a><a class="back" href="/">&larr; Back to store</a></header>
+<main><h1>%%TITLE%%</h1>%%BODY%%</main>
+<footer>%%NAV%%</footer>
+</body></html>"""
+
+
+def render_policy_page(s, slug, title, body):
+    t = theme_vars(s)
+    css = (f"--btn:{t['btn']};--btn-text:{t['btnText']};--bg:{t['bg']};--surface:{t['surface']};--ink:{t['ink']};"
+           f"--muted:{t['muted']};--line:{t['line']};--soft:{t['soft']};--font:{t['font']}")
+    nav = "".join(f'<a href="/policy/{sl}">{escape(tt)}</a>' for sl, tt in POLICY_PAGES)
+    html = POLICY_TEMPLATE
+    for key, value in (("%%TITLE%%", str(escape(title))), ("%%STORE%%", _p(s, "storeName", "Store")),
+                       ("%%VARS%%", css), ("%%BODY%%", body), ("%%NAV%%", nav)):
+        html = html.replace(key, value)
+    return html
+
+
+@app.get("/policy/<slug>")
+def policy_page(slug):
+    s = settings_dict()
+    pages = build_policy_pages(s)
+    if slug not in pages:
+        abort(404)
+    title = dict(POLICY_PAGES)[slug]
+    return Response(render_policy_page(s, slug, title, pages[slug]), mimetype="text/html")
+
+
+@app.get("/favicon.svg")
+@app.get("/favicon.ico")
+def favicon():
+    s = settings_dict()
+    t = theme_vars(s)
+    letter = (_p(s, "storeName", "G") or "G")[:1].upper()
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="{t["btn"]}"/>'
+           f'<text x="32" y="45" font-size="38" font-weight="800" text-anchor="middle" font-family="Arial,sans-serif" fill="{t["btnText"]}">{letter}</text></svg>')
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+LOGIN_FAILS = {}
+
+
+def _login_blocked(ip):
+    now = datetime.now(timezone.utc).timestamp()
+    recent = [t for t in LOGIN_FAILS.get(ip, []) if now - t < 900]
+    LOGIN_FAILS[ip] = recent
+    if len(LOGIN_FAILS) > 5000:
+        LOGIN_FAILS.clear()
+    return len(recent) >= 8
+
+
+
 @app.get("/")
 def home():
     return send_from_directory(PUBLIC_DIR, "index.html")
@@ -346,17 +653,24 @@ def store_api():
 
 @app.get("/api/products")
 def products_api():
-    products = Product.query.order_by(Product.id.desc()).all()
-    return jsonify([{**product_dict(p), "id": str(p.id)} for p in products])
+    query = Product.query.order_by(Product.id.desc())
+    if not is_admin():
+        query = query.filter_by(active=True)
+    return jsonify([{**product_dict(p), "id": str(p.id)} for p in query.all()])
 
 
 @app.post("/api/admin/login")
 def admin_login():
+    ip = request.remote_addr or "unknown"
+    if _login_blocked(ip):
+        return jsonify({"error": "Too many failed attempts. Please wait 15 minutes and try again."}), 429
     data = request.get_json(silent=True) or {}
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", ""))
     if not secrets.compare_digest(email, ADMIN_EMAIL) or not admin_password_ok(password):
+        LOGIN_FAILS.setdefault(ip, []).append(datetime.now(timezone.utc).timestamp())
         return jsonify({"error": "Invalid email or password"}), 401
+    LOGIN_FAILS.pop(ip, None)
     session.clear()
     session["admin"] = True
     session["csrf_token"] = secrets.token_urlsafe(32)
@@ -499,6 +813,8 @@ def save_settings():
             continue
         if key in BANNER_KEYS and value and not (len(split_images(value)) == 1 and valid_image_url(value)):
             continue
+        if key in POLICY_KEYS:
+            value = re.sub(r"[\r\n]+", " ", value).strip()[:300]
         if key == "themePreset" and value not in THEME_PRESETS:
             continue
         if key == "themeFont" and value not in THEME_FONTS:
@@ -796,7 +1112,7 @@ def lookup_orders():
         .limit(3000)
         .all()
     )
-    mine = [o for o in recent if _digits(o.customer_phone)[-10:] == wanted][:20]
+    mine = [o for o in recent if _digits(o.customer_phone)[-10:] == wanted][:100]
     return jsonify({
         "orders": [
             {
