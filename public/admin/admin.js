@@ -348,4 +348,88 @@ async function loadRevenueReport(){
         </div>
     `;
 }
-function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}boot();
+function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}
+(function(){
+const THEMES={
+classic:{name:'Classic',btn:'#111111',bg:'#ffffff',surface:'#ffffff',ink:'#161616',muted:'#6b6b6b',line:'#e7e7e7',soft:'#f6f5f1',hero1:'#f4efe5',hero2:'#ffe0d6',radius:'18px'},
+midnight:{name:'Midnight',btn:'#ff5a36',bg:'#0f1115',surface:'#181b22',ink:'#f2f3f5',muted:'#9aa0ab',line:'#2a2f3a',soft:'#20242d',hero1:'#1b1f2a',hero2:'#2b1f2e',radius:'16px'},
+forest:{name:'Fresh Green',btn:'#14532d',bg:'#ffffff',surface:'#ffffff',ink:'#10231a',muted:'#5b6f64',line:'#dfe9e2',soft:'#f1f7f3',hero1:'#e8f5ec',hero2:'#d3eddc',radius:'14px'},
+ocean:{name:'Ocean Blue',btn:'#1d4ed8',bg:'#ffffff',surface:'#ffffff',ink:'#0f172a',muted:'#64748b',line:'#e2e8f0',soft:'#f1f5f9',hero1:'#e0ecff',hero2:'#cfe0ff',radius:'14px'},
+rose:{name:'Rose',btn:'#be185d',bg:'#fffafb',surface:'#ffffff',ink:'#2a1520',muted:'#7a5c69',line:'#f1dfe6',soft:'#fbf1f5',hero1:'#ffe4ec',hero2:'#ffd1df',radius:'22px'},
+mono:{name:'Minimal',btn:'#000000',bg:'#ffffff',surface:'#ffffff',ink:'#000000',muted:'#666666',line:'#dddddd',soft:'#f5f5f5',hero1:'#f5f5f5',hero2:'#ebebeb',radius:'4px'}};
+const FONTS={modern:'Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif',serif:'Georgia,"Times New Roman",serif'};
+const HEX=/^#[0-9a-f]{6}$/i;
+const lum=h=>{const c=[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+const FIELDS=[['btn','Main color (buttons, top bar, footer)'],['bg','Page background'],['ink','Text color'],['hero1','Banner color (left)'],['hero2','Banner color (right)']];
+let st={preset:'classic',font:'modern',btn:'',bg:'',ink:'',hero1:'',hero2:'',banner1:'',banner2:'',banner3:''};
+function vars(){const t=Object.assign({},THEMES[st.preset]||THEMES.classic);if(HEX.test(st.btn))t.btn=st.btn;if(HEX.test(st.bg)){t.bg=st.bg;t.surface=st.bg}if(HEX.test(st.ink))t.ink=st.ink;if(HEX.test(st.hero1))t.hero1=st.hero1;if(HEX.test(st.hero2))t.hero2=st.hero2;t.btnText=lum(t.btn)>.55?'#111111':'#ffffff';t.font=FONTS[st.font]||FONTS.modern;return t}
+const css=document.createElement('style');css.textContent=`
+.thH{margin:0 0 14px;font-size:18px}
+.thGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.thOpt{border:2px solid #e7e7e7;background:#fff;border-radius:14px;padding:10px;cursor:pointer;text-align:left;font:inherit}
+.thOpt.on{border-color:#111;box-shadow:0 0 0 3px rgba(0,0,0,.08)}
+.thMini{height:64px;border-radius:10px;background:linear-gradient(115deg,var(--hero1),var(--hero2));position:relative;margin-bottom:8px;border:1px solid var(--line)}
+.thMini i{position:absolute;left:10px;bottom:10px;width:46px;height:16px;border-radius:99px;background:var(--btn)}
+.thMini b{position:absolute;left:10px;top:10px;width:60px;height:8px;border-radius:4px;background:var(--ink);opacity:.8}
+.thName{font-weight:700;font-size:14px}
+.thColors{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+.thColors label{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e7e7e7;border-radius:12px;padding:10px 12px;font-size:14px}
+.thColors input[type=color]{width:46px;height:34px;border:0;background:none;padding:0;cursor:pointer}
+.thLink{background:none;border:0;color:#1d4ed8;font-weight:700;cursor:pointer;padding:6px 0;font:inherit}
+.thFont{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px}
+.thFont select{padding:9px 12px;border:1px solid #e7e7e7;border-radius:10px;font:inherit}
+.thNote{color:#777;margin:0 0 14px;font-size:14px}
+.thBn{display:grid;grid-template-columns:80px 1fr 120px;gap:10px;align-items:center;margin-bottom:10px}
+.thBn input{padding:10px 12px;border:1px solid #e7e7e7;border-radius:10px;font:inherit;min-width:0}
+.thBn img{width:120px;height:45px;object-fit:cover;border-radius:8px;border:1px solid #e7e7e7}
+.thPrev{border:1px solid #e7e7e7;border-radius:14px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font)}
+.thTop{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.thTop b{font-size:18px}
+.thCartB{background:var(--btn);color:var(--btn-text);padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700}
+.thHero{padding:26px 18px;background:linear-gradient(115deg,var(--hero1),var(--hero2))}
+.thHero h3{margin:0 0 6px;font-size:22px}
+.thHero p{margin:0 0 12px;color:var(--muted)}
+.thShop{display:inline-block;background:var(--btn);color:var(--btn-text);padding:9px 16px;border-radius:99px;font-weight:700;font-size:13px}
+.thCards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px}
+.thCard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px;font-size:13px}
+.thCard i{display:block;height:60px;border-radius:max(0px,calc(var(--radius) - 6px));background:var(--soft);margin-bottom:8px}
+.thCard s{color:var(--muted);margin-left:4px}
+.thAdd{margin-top:8px;border:1px solid var(--btn);color:var(--btn);border-radius:9px;padding:6px;text-align:center;font-weight:700;font-size:12px}
+.thFoot{background:var(--btn);color:var(--btn-text);padding:12px 16px;font-size:12px}
+@media(max-width:640px){.thCards{grid-template-columns:1fr 1fr}.thBn{grid-template-columns:1fr}}`;
+document.head.appendChild(css);
+const aside=document.querySelector('aside'),main=document.querySelector('main');
+const tabBtn=document.createElement('button');tabBtn.dataset.tab='appearance';tabBtn.textContent='Appearance';
+aside.insertBefore(tabBtn,aside.querySelector('a'));
+const sec=document.createElement('section');sec.id='appearance';sec.className='tab hidden';
+sec.innerHTML=`<div class="sectionHead"><div><h1>Appearance</h1><p>Choose a template and colors for your store. No coding needed.</p></div><button class="primary" id="thSave">Save &amp; Publish</button></div>
+<div class="panel"><h2 class="thH">1. Choose a template</h2><div class="thGrid" id="thGrid"></div></div>
+<div class="panel" style="margin-top:16px"><h2 class="thH">2. Customize colors (optional)</h2><div class="thColors" id="thColors"></div><button class="thLink" id="thReset">Reset to template colors</button><label class="thFont">Font style <select id="thFont"><option value="modern">Modern</option><option value="serif">Elegant serif</option></select></label></div>
+<div class="panel" style="margin-top:16px"><h2 class="thH">3. Banner slider (1 to 3 images)</h2><p class="thNote">Paste a direct image link for each banner. Best size: 1600 × 600 px. Leave all three empty to keep the normal text banner. Banners slide automatically every 5 seconds.</p><div id="thBanners"></div></div>
+<div class="panel" style="margin-top:16px"><h2 class="thH">4. Preview</h2><div class="thPrev" id="thPrev"></div></div>`;
+main.appendChild(sec);
+function vstyle(t){return `--btn:${t.btn};--btn-text:${t.btnText};--bg:${t.bg};--surface:${t.surface};--ink:${t.ink};--muted:${t.muted};--line:${t.line};--soft:${t.soft};--hero1:${t.hero1};--hero2:${t.hero2};--radius:${t.radius};--font:${t.font}`}
+function renderAll(){
+const t=vars();
+document.getElementById('thGrid').innerHTML=Object.keys(THEMES).map(k=>{const p=Object.assign({},THEMES[k]);p.btnText=lum(p.btn)>.55?'#111111':'#ffffff';return `<button class="thOpt ${st.preset===k?'on':''}" data-k="${k}" style="--btn:${p.btn};--hero1:${p.hero1};--hero2:${p.hero2};--ink:${p.ink};--line:${p.line}"><div class="thMini"><b></b><i></i></div><div class="thName">${esc(p.name)}</div></button>`}).join('');
+document.querySelectorAll('#thGrid .thOpt').forEach(b=>b.onclick=()=>{st.preset=b.dataset.k;st.btn=st.bg=st.ink=st.hero1=st.hero2='';renderAll()});
+const box=document.getElementById('thColors');
+if(!box.children.length){box.innerHTML=FIELDS.map(f=>`<label>${esc(f[1])}<input type="color" data-k="${f[0]}"></label>`).join('');box.querySelectorAll('input').forEach(i=>i.oninput=()=>{st[i.dataset.k]=i.value;renderPreview()})}
+box.querySelectorAll('input').forEach(i=>{const k=i.dataset.k;i.value=HEX.test(st[k])?st[k]:t[k]});
+document.getElementById('thFont').value=st.font;
+const bb=document.getElementById('thBanners');
+if(!bb.children.length){bb.innerHTML=[1,2,3].map(n=>`<div class="thBn"><span>Banner ${n}</span><input data-b="banner${n}" placeholder="https://i.ibb.co/.../banner${n}.jpg"><img alt="" style="display:none"></div>`).join('');bb.querySelectorAll('input').forEach(i=>{i.oninput=()=>{st[i.dataset.b]=i.value.trim();thumb(i)}})}
+bb.querySelectorAll('input').forEach(i=>{i.value=st[i.dataset.b]||'';thumb(i)});
+renderPreview()}
+function thumb(i){const im=i.nextElementSibling;if(/^https?:\/\//i.test(i.value)){im.onerror=()=>{im.style.display='none'};im.src=i.value;im.style.display='block'}else{im.style.display='none'}}
+function renderPreview(){const t=vars();const p=document.getElementById('thPrev');p.setAttribute('style',vstyle(t));
+p.innerHTML=`<div class="thTop"><b>GRABIT</b><span class="thCartB">Cart 0</span></div><div class="thHero"><h3>Shop smart. GRAB it.</h3><p>Quality products at great prices.</p><span class="thShop">Shop now</span></div><div class="thCards">${[1,2,3].map(n=>`<div class="thCard"><i></i><b>Product ${n}</b><div>₹250<s>₹350</s></div><div class="thAdd">Add to cart</div></div>`).join('')}</div><div class="thFoot">© GRABIT</div>`}
+document.getElementById('thReset').onclick=()=>{st.btn=st.bg=st.ink=st.hero1=st.hero2='';renderAll()};
+document.getElementById('thFont').onchange=e=>{st.font=e.target.value;renderPreview()};
+document.getElementById('thSave').onclick=async()=>{const b=document.getElementById('thSave');b.disabled=true;try{await api('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({themePreset:st.preset,themeFont:st.font,themeBtn:st.btn,themeBg:st.bg,themeInk:st.ink,themeHero1:st.hero1,themeHero2:st.hero2,banner1:st.banner1,banner2:st.banner2,banner3:st.banner3})});toast('Saved. Your store now uses this look.')}catch(e){toast(e.message)}finally{b.disabled=false}};
+async function load(){try{const s=await api('/api/admin/settings');st={preset:THEMES[s.themePreset]?s.themePreset:'classic',font:FONTS[s.themeFont]?s.themeFont:'modern',btn:s.themeBtn||'',bg:s.themeBg||'',ink:s.themeInk||'',hero1:s.themeHero1||'',hero2:s.themeHero2||'',banner1:s.banner1||'',banner2:s.banner2||'',banner3:s.banner3||''}}catch(e){}renderAll()}
+tabBtn.onclick=()=>{showTab('appearance');load()};
+renderAll();
+})();
+
+boot();
