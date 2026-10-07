@@ -441,10 +441,10 @@ def admin_dashboard():
 
     order_count = Order.query.count()
 
-    ppending = Order.query.filter(
-    Order.payment_status == "paid",
-    Order.status.in_(["paid", "processing", "shipped"])
-).count()
+    pending = Order.query.filter(
+        Order.payment_status == "paid",
+        Order.status.in_(["paid", "processing", "shipped"]),
+    ).count()
 
     recent = Order.query.order_by(
         Order.created_at.desc()
@@ -748,118 +748,50 @@ def _digits(value):
     return re.sub(r"\D", "", str(value or ""))
 
 
-@app.post("/api/orders/track")
-def track_order():
-    ip = request.remote_addr or "unknown"
-    now = datetime.now(timezone.utc).timestamp()
-
-    ...
-
-    return jsonify({
-        "id": order.id,
-        "status": order.status,
-        "paymentStatus": order.payment_status,
-        "total": float(order.total),
-        "createdAt": order.created_at.isoformat() if order.created_at else None,
-        "items": [
-            {"name": i.product_name, "price": float(i.unit_price), "quantity": i.quantity}
-            for i in order.items
-        ],
-    })
-def track_order():
+@app.post("/api/orders/lookup")
+def lookup_orders():
     ip = request.remote_addr or "unknown"
     now = datetime.now(timezone.utc).timestamp()
     if len(TRACK_HITS) > 5000:
         TRACK_HITS.clear()
     hits = [t for t in TRACK_HITS.get(ip, []) if now - t < 600]
-    if len(hits) >= 15:
+    if len(hits) >= 10:
         return jsonify({"error": "Too many attempts. Please try again in a few minutes."}), 429
     hits.append(now)
     TRACK_HITS[ip] = hits
 
     data = request.get_json(silent=True) or {}
-    order_no = _digits(data.get("orderId"))
     phone = _digits(data.get("phone"))
-    not_found = (jsonify({"error": "We could not find an order with these details."}), 404)
-    if not order_no or len(order_no) > 9 or len(phone) < 8:
-        return not_found
-    order = db.session.get(Order, int(order_no))
-    if not order or _digits(order.customer_phone)[-10:] != phone[-10:]:
-        return not_found
+    if len(phone) < 10:
+        return jsonify({"error": "Please enter your 10-digit phone number."}), 400
+    wanted = phone[-10:]
+    recent = (
+        Order.query.filter(Order.payment_status == "paid")
+        .order_by(Order.id.desc())
+        .limit(3000)
+        .all()
+    )
+    mine = [o for o in recent if _digits(o.customer_phone)[-10:] == wanted][:20]
     return jsonify({
-        "id": order.id,
-        "status": order.status,
-        "paymentStatus": order.payment_status,
-        "total": float(order.total),
-        "createdAt": order.created_at.isoformat() if order.created_at else None,
-        "items": [
-            {"name": i.product_name, "price": float(i.unit_price), "quantity": i.quantity}
-            for i in order.items
-        ],
+        "orders": [
+            {
+                "id": o.id,
+                "status": o.status,
+                "paymentStatus": o.payment_status,
+                "total": float(o.total),
+                "createdAt": o.created_at.isoformat() if o.created_at else None,
+                "items": [
+                    {"name": i.product_name, "price": float(i.unit_price), "quantity": i.quantity}
+                    for i in o.items
+                ],
+            }
+            for o in mine
+        ]
     })
-@app.post("/api/orders/lookup")
-def lookup_orders():
-    ip = request.remote_addr or "unknown"
-    now = datetime.now(timezone.utc).timestamp()
 
-    if len(TRACK_HITS) > 5000:
-        TRACK_HITS.clear()
 
-    hits = [t for t in TRACK_HITS.get(ip, []) if now - t < 600]
-
-    if len(hits) >= 15:
-        return jsonify({
-            "error": "Too many attempts. Please try again in a few minutes."
-        }), 429
-
-    hits.append(now)
-    TRACK_HITS[ip] = hits
-
-    data = request.get_json(silent=True) or {}
-    phone = _digits(data.get("phone"))
-
-    if len(phone) < 8:
-        return jsonify({
-            "error": "Please enter a valid phone number."
-        }), 400
-
-    phone_last10 = phone[-10:]
-
-    orders = Order.query.order_by(Order.id.desc()).all()
-
-    matched_orders = []
-
-    for order in orders:
-        order_phone = _digits(order.customer_phone)
-
-        if order_phone[-10:] != phone_last10:
-            continue
-
-        if order.payment_status != "paid":
-            continue
-
-        matched_orders.append({
-            "id": order.id,
-            "status": order.status,
-            "paymentStatus": order.payment_status,
-            "total": float(order.total),
-            "createdAt": (
-                order.created_at.isoformat()
-                if order.created_at else None
-            ),
-            "items": [
-                {
-                    "name": item.product_name,
-                    "price": float(item.unit_price),
-                    "quantity": item.quantity
-                }
-                for item in order.items
-            ]
-        })
-
-    return jsonify({
-        "orders": matched_orders
-    })
+@app.post("/api/razorpay/webhook")
+def razorpay_webhook():
     if not RAZORPAY_WEBHOOK_SECRET:
         return jsonify({"error": "Webhook is not configured"}), 503
     signature = request.headers.get("X-Razorpay-Signature", "")
