@@ -105,3 +105,13 @@ input,textarea,select{background:var(--surface);color:var(--ink)}
 .coRm:hover{text-decoration:underline}
 .coSum{border-top:1px solid var(--line);padding:12px 0 8px;display:grid;gap:6px;font-size:14px}
 .coSum div{display:flex;justify-content:space-between}
+.moreWrap{text-align:center;margin-top:18px}
+.moreBtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--btn);background:var(--surface);color:var(--btn);border-radius:99px;padding:12px 24px;font-weight:700;font-size:15px;cursor:pointer}
+.moreBtn:hover{background:var(--btn);color:var(--btn-text)}
+.moreBtn span{font-size:18px;line-height:1}
+@media(min-width:701px){.moreWrap{display:none}}
+.policyLinks{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px 20px;border-top:1px solid rgba(128,128,128,.35);padding-top:18px;margin-top:6px}
+.policyLinks a{color:var(--btn-text);opacity:.8;text-decoration:none;font-size:14px}
+.policyLinks a:hover{opacity:1;text-decoration:underline}
+.coTerms{display:block;line-height:1.5}
+.coTerms a{color:inherit;text-decoration:underline}
