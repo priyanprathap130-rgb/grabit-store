@@ -481,4 +481,5 @@ document.getElementById('plSave').onclick=async()=>{const b=document.getElementB
 tabBtn.onclick=()=>{showTab('policies');load()};
 })();
 
+async function saveSettings(){const body={};document.querySelectorAll('#settingsForm [data-key]').forEach(x=>body[x.dataset.key]=['shippingCharge','freeShippingAbove'].includes(x.dataset.key)?Number(x.value||0):x.value);try{await api('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});toast('Settings saved')}catch(e){toast(e.message)}}
 boot();
