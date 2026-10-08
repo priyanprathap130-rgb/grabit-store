@@ -115,3 +115,9 @@ input,textarea,select{background:var(--surface);color:var(--ink)}
 .policyLinks a:hover{opacity:1;text-decoration:underline}
 .coTerms{display:block;line-height:1.5}
 .coTerms a{color:inherit;text-decoration:underline}
+.bnText{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:10px;padding:0 8%;background:linear-gradient(90deg,rgba(0,0,0,.6),rgba(0,0,0,.25) 55%,rgba(0,0,0,0));color:#fff;pointer-events:none;z-index:1}
+.bnText h2{margin:0;font-size:clamp(22px,4.2vw,52px);line-height:1.1;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35);max-width:620px}
+.bnText p{margin:0;font-size:clamp(14px,1.7vw,20px);max-width:520px;opacity:.95}
+.bnCta{pointer-events:auto;display:inline-block;background:var(--btn);color:var(--btn-text);padding:11px 22px;border-radius:99px;font-weight:700;text-decoration:none;font-size:clamp(13px,1.5vw,16px)}
+.bnArrow,.bnDots{z-index:2}
+@media(max-width:700px){.bnText{justify-content:flex-end;gap:8px;padding:0 18px 36px;background:linear-gradient(0deg,rgba(0,0,0,.7),rgba(0,0,0,.05) 70%)}.bnText p{display:none}.bnText h2{font-size:22px}.bnCta{padding:9px 18px}}
