@@ -144,6 +144,7 @@ DEFAULT_SETTINGS = {
     "banner1": "",
     "banner2": "",
     "banner3": "",
+    "bannerText": "1",
     "bizName": "",
     "gstin": "",
     "hours": "",
@@ -259,6 +260,9 @@ EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 def validate_customer(name, phone, email, address):
     if not name or len(name) > 180 or len(phone) > 40 or len(address) > 2000:
+        return False
+    phone_digits = re.sub(r"\D", "", phone)
+    if not 10 <= len(phone_digits) <= 15:
         return False
     if email and (len(email) > 180 or not EMAIL_RE.match(email)):
         return False
@@ -813,6 +817,8 @@ def save_settings():
             continue
         if key in BANNER_KEYS and value and not (len(split_images(value)) == 1 and valid_image_url(value)):
             continue
+        if key == "bannerText" and value not in {"0", "1"}:
+            continue
         if key in POLICY_KEYS:
             value = re.sub(r"[\r\n]+", " ", value).strip()[:300]
         if key == "themePreset" and value not in THEME_PRESETS:
@@ -913,6 +919,17 @@ def delete_product(product_id):
     if not product:
         return jsonify({"error": "Product not found"}), 404
     product.active = False
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/admin/products/<int:product_id>/permanent")
+@csrf_required
+def delete_product_forever(product_id):
+    product = db.session.get(Product, product_id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    db.session.delete(product)
     db.session.commit()
     return jsonify({"ok": True})
 
