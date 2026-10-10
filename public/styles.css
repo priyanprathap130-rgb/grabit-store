@@ -121,3 +121,18 @@ input,textarea,select{background:var(--surface);color:var(--ink)}
 .bnCta{pointer-events:auto;display:inline-block;background:var(--btn);color:var(--btn-text);padding:11px 22px;border-radius:99px;font-weight:700;text-decoration:none;font-size:clamp(13px,1.5vw,16px)}
 .bnArrow,.bnDots{z-index:2}
 @media(max-width:700px){.bnText{justify-content:flex-end;gap:8px;padding:0 18px 36px;background:linear-gradient(0deg,rgba(0,0,0,.7),rgba(0,0,0,.05) 70%)}.bnText p{display:none}.bnText h2{font-size:22px}.bnCta{padding:9px 18px}}
+/* ---- mobile fix: never crop banners or product photos ---- */
+.bnStage{position:relative;overflow:hidden}
+.bnTextM{display:none}
+.cardImg{background:#fff}
+.cardImg img{object-fit:contain}
+@media(max-width:700px){
+.bnTrack{align-items:flex-start}
+.bnSlide img{aspect-ratio:auto;height:auto;object-fit:contain}
+.bnText{display:none}
+.bnTextM{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px 18px 18px;background:var(--surface);color:var(--ink)}
+.bnTextM h2{margin:0;font-size:22px;line-height:1.15;letter-spacing:-.5px}
+.bnTextM p{margin:0;font-size:14px;color:var(--muted)}
+.bnArrow{width:30px;height:30px;font-size:20px}
+.bnArrow.l{left:8px}.bnArrow.r{right:8px}
+}
